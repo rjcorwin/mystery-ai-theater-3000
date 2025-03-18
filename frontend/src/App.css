@@ -1,0 +1,29 @@
+.App {
+    text-align: center;
+    font-family: Arial, sans-serif;
+  }
+  
+  .video-container {
+    margin: 20px;
+  }
+  
+  .commentary {
+    margin-top: 20px;
+    font-size: 1.2em;
+  }
+  
+  .viewers {
+    display: flex;
+    justify-content: center;
+    margin-top: 20px;
+  }
+  
+  .viewer {
+    margin: 0 20px;
+    transition: transform 0.5s;
+  }
+  
+  .viewer.talking {
+    transform: translateY(-10px);
+  }
+  
