@@ -2,93 +2,188 @@ import React, { useState, useRef, useEffect } from 'react';
 import './App.css';
 
 function App() {
-  const videoRef = useRef(null);
-  const canvasRef = useRef(null);
-  const [stream, setStream] = useState(null);
   const [ws, setWs] = useState(null);
-  const [commentary, setCommentary] = useState("");
-  const [animatingViewer1, setAnimatingViewer1] = useState(false);
-  const [animatingViewer2, setAnimatingViewer2] = useState(false);
+  const [messages, setMessages] = useState([]);
+  const [participants, setParticipants] = useState([]);
+  const [currentMessage, setCurrentMessage] = useState('');
+  const [userName, setUserName] = useState('');
+  const [isConnected, setIsConnected] = useState(false);
+  const [showJoinForm, setShowJoinForm] = useState(true);
+  const messagesEndRef = useRef(null);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
 
   useEffect(() => {
-    // Open WebSocket connection to the backend
-    const socket = new WebSocket("ws://localhost:8080/ws");
-    socket.onopen = () => {
-      console.log("WebSocket connection established");
-    };
-    socket.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-      setCommentary(data.text);
-      // Trigger animations based on viewer tags
-      if (data.text.includes("<viewer-1>")) {
-        setAnimatingViewer1(true);
-        setTimeout(() => setAnimatingViewer1(false), 500);
-      }
-      if (data.text.includes("<viewer-2>")) {
-        setAnimatingViewer2(true);
-        setTimeout(() => setAnimatingViewer2(false), 500);
-      }
-    };
-    socket.onclose = () => {
-      console.log("WebSocket connection closed");
-    };
-    setWs(socket);
-  }, []);
+    scrollToBottom();
+  }, [messages]);
 
-  const startCapture = async () => {
-    try {
-      // Prompt user to share a screen or window
-      const mediaStream = await navigator.mediaDevices.getDisplayMedia({
-        video: { cursor: "always" },
-        audio: false,
-      });
-      setStream(mediaStream);
-      if (videoRef.current) {
-        videoRef.current.srcObject = mediaStream;
+  const connectToChat = () => {
+    if (!userName.trim()) return;
+    
+    const userId = `user_${Date.now()}`;
+    const socketUrl = `ws://localhost:8080/ws?id=${userId}&name=${encodeURIComponent(userName)}`;
+    const socket = new WebSocket(socketUrl);
+    
+    socket.onopen = () => {
+      console.log("Connected to Mix chat");
+      setIsConnected(true);
+      setShowJoinForm(false);
+    };
+    
+    socket.onmessage = (event) => {
+      const message = JSON.parse(event.data);
+      
+      switch (message.type) {
+        case 'chat':
+        case 'bot_message':
+        case 'user_join':
+        case 'user_leave':
+          setMessages(prev => [...prev, message]);
+          break;
+        case 'participants':
+          setParticipants(message.data);
+          break;
+        default:
+          console.log('Unknown message type:', message.type);
       }
-      // Begin periodic screenshot capture every 3 seconds
-      setInterval(sendScreenshot, 3000);
-    } catch (err) {
-      console.error("Error capturing screen: ", err);
+    };
+    
+    socket.onclose = () => {
+      console.log("Disconnected from Mix chat");
+      setIsConnected(false);
+      setShowJoinForm(true);
+    };
+    
+    socket.onerror = (error) => {
+      console.error("WebSocket error:", error);
+      setIsConnected(false);
+    };
+    
+    setWs(socket);
+  };
+
+  const sendMessage = () => {
+    if (!currentMessage.trim() || !ws) return;
+    
+    const message = {
+      type: 'chat',
+      content: currentMessage,
+    };
+    
+    ws.send(JSON.stringify(message));
+    setCurrentMessage('');
+  };
+
+  const handleKeyPress = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
     }
   };
 
-  const sendScreenshot = () => {
-    if (!videoRef.current || !canvasRef.current || !ws) return;
-    const video = videoRef.current;
-    const canvas = canvasRef.current;
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    const context = canvas.getContext("2d");
-    context.drawImage(video, 0, 0, canvas.width, canvas.height);
-    // Convert canvas image to base64 PNG
-    const imageData = canvas.toDataURL("image/png");
-    ws.send(JSON.stringify({ imageData }));
+  const formatTimestamp = (timestamp) => {
+    return new Date(timestamp * 1000).toLocaleTimeString();
   };
+
+  const getParticipantName = (fromId) => {
+    const participant = participants.find(p => p.id === fromId);
+    return participant ? participant.name : fromId;
+  };
+
+  const getParticipantType = (fromId) => {
+    const participant = participants.find(p => p.id === fromId);
+    return participant ? participant.type : 'unknown';
+  };
+
+  if (showJoinForm) {
+    return (
+      <div className="App">
+        <div className="join-form">
+          <h1>Mix Chat</h1>
+          <p>A generic chat client for humans and AI bots</p>
+          <div className="form-group">
+            <label htmlFor="userName">Your Name:</label>
+            <input
+              id="userName"
+              type="text"
+              value={userName}
+              onChange={(e) => setUserName(e.target.value)}
+              placeholder="Enter your name"
+              onKeyPress={(e) => e.key === 'Enter' && connectToChat()}
+            />
+          </div>
+          <button onClick={connectToChat} disabled={!userName.trim()}>
+            Join Chat
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="App">
-      <h1>Mystery Game Theater 3000</h1>
-      <button onClick={startCapture}>Start Game Capture</button>
-      <div className="video-container">
-        <video
-          ref={videoRef}
-          autoPlay
-          muted
-          style={{ width: "80%", border: "1px solid black" }}
-        />
-      </div>
-      <canvas ref={canvasRef} style={{ display: "none" }} />
-      <div className="commentary">
-        <h2>Esteemed Viewers Commentary:</h2>
-        <p>{commentary}</p>
-      </div>
-      <div className="viewers">
-        <div className={`viewer ${animatingViewer1 ? "talking" : ""}`}>
-          <img src="/robot1.png" alt="Esteemed Viewer 1" />
+      <div className="chat-container">
+        <div className="chat-header">
+          <h1>Mix Chat</h1>
+          <div className="connection-status">
+            {isConnected ? '🟢 Connected' : '🔴 Disconnected'}
+          </div>
         </div>
-        <div className={`viewer ${animatingViewer2 ? "talking" : ""}`}>
-          <img src="/robot2.png" alt="Esteemed Viewer 2" />
+        
+        <div className="chat-main">
+          <div className="participants-panel">
+            <h3>Participants ({participants.length})</h3>
+            <div className="participants-list">
+              {participants.map(participant => (
+                <div key={participant.id} className={`participant ${participant.type}`}>
+                  <span className="participant-icon">
+                    {participant.type === 'bot' ? '🤖' : '👤'}
+                  </span>
+                  <span className="participant-name">{participant.name}</span>
+                  <span className="participant-status">
+                    {participant.connected ? '●' : '○'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+          
+          <div className="messages-panel">
+            <div className="messages-container">
+              {messages.map((message, index) => (
+                <div key={index} className={`message ${message.type}`}>
+                  <div className="message-header">
+                    <span className={`message-sender ${getParticipantType(message.from)}`}>
+                      {getParticipantType(message.from) === 'bot' ? '🤖' : '👤'}
+                      {getParticipantName(message.from)}
+                    </span>
+                    <span className="message-time">
+                      {formatTimestamp(message.timestamp)}
+                    </span>
+                  </div>
+                  <div className="message-content">
+                    {message.content}
+                  </div>
+                </div>
+              ))}
+              <div ref={messagesEndRef} />
+            </div>
+            
+            <div className="message-input">
+              <textarea
+                value={currentMessage}
+                onChange={(e) => setCurrentMessage(e.target.value)}
+                onKeyPress={handleKeyPress}
+                placeholder="Type your message... (Enter to send)"
+                disabled={!isConnected}
+              />
+              <button onClick={sendMessage} disabled={!currentMessage.trim() || !isConnected}>
+                Send
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </div>
