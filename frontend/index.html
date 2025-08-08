@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Mystery AI Theater 3000</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div id="app">
+      <header>
+        <h1>Mystery AI Theater 3000</h1>
+        <button id="shareBtn">Share Game Window</button>
+        <label>
+          Interval (ms)
+          <input id="intervalInput" type="number" min="500" step="100" value="2500" />
+        </label>
+      </header>
+
+      <main>
+        <div class="stage">
+          <video id="preview" autoplay muted playsinline></video>
+          <canvas id="captureCanvas" width="1280" height="720" style="display:none"></canvas>
+          <div class="theater">
+            <div id="viewer1" class="viewer">🤖</div>
+            <div id="viewer2" class="viewer">🤖</div>
+          </div>
+        </div>
+
+        <section class="log">
+          <h2>Esteemed Viewers</h2>
+          <div id="log"></div>
+        </section>
+      </main>
+    </div>
+
+    <script type="module" src="/main.js"></script>
+  </body>
+  </html>
+
+
