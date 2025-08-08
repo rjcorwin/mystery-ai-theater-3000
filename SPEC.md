@@ -1,8 +1,3 @@
-I'd like the write an app. A fantastic app. Full of wonder. And awe. And wonder. Remember the show Mystery Science Theater 3000? I want to recreate that experience, but in a webapp, and instead of a movie, I share via my web browser a window of a video game I'm playing (poorly). We'll keep the two little robots in the front row, but instead of the robots being voiced by real life humans, it's voiced by AI! The robots will watch the game and make sarcastic comments. It's gonna be great. The little robots will watch, listen, and comment away while the user plays their game. The little robots will be henceforth referred to as... Esteemed Viewers.
-
-Please write all the code for the frontend and the backend. Lastly provide me directions on how to get it running on my local computer so I can kick the tires.
-
-
 # Mystery Game Theater 3000 - Webapp Spec
 
 ## Overview
