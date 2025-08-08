@@ -21,6 +21,7 @@ cd backend && go mod tidy && go run ./cmd/server
 3) Use
 - Click "Share Game Window" and pick your game window.
 - You will see two robots at the bottom; when they speak, they jiggle. Commentary text appears in the log; browser TTS reads lines.
+ - Controls: "Stop Share" ends screensharing; "Mute/Unmute" toggles TTS; changing "Interval (ms)" updates capture cadence live.
 
 Development notes
 -----------------

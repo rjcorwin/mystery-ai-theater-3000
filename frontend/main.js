@@ -1,5 +1,7 @@
 const preview = document.getElementById('preview');
 const shareBtn = document.getElementById('shareBtn');
+const stopBtn = document.getElementById('stopBtn');
+const muteBtn = document.getElementById('muteBtn');
 const intervalInput = document.getElementById('intervalInput');
 const captureCanvas = document.getElementById('captureCanvas');
 const logEl = document.getElementById('log');
@@ -9,6 +11,12 @@ const viewer2 = document.getElementById('viewer2');
 let stream = null;
 let ws = null;
 let captureTimer = null;
+let isMuted = false;
+
+function setButtonsState(capturing) {
+  shareBtn.disabled = !!capturing;
+  stopBtn.disabled = !capturing;
+}
 
 function appendLine(who, text) {
   const div = document.createElement('div');
@@ -25,6 +33,7 @@ function appendLine(who, text) {
 }
 
 function speak(text, which) {
+  if (isMuted) return;
   if (!('speechSynthesis' in window)) return;
   const utter = new SpeechSynthesisUtterance(text);
   utter.rate = 1.1;
@@ -59,6 +68,7 @@ async function startShare() {
     preview.srcObject = stream;
     openSocket();
     scheduleCapture();
+    setButtonsState(true);
   } catch (err) {
     console.error('Share failed', err);
     alert('Failed to share window: ' + err.message);
@@ -133,6 +143,35 @@ function openSocket() {
 }
 
 shareBtn.addEventListener('click', startShare);
+stopBtn.addEventListener('click', stopShare);
 intervalInput.addEventListener('change', scheduleCapture);
+intervalInput.addEventListener('input', scheduleCapture);
+muteBtn.addEventListener('click', () => {
+  isMuted = !isMuted;
+  muteBtn.textContent = isMuted ? '🔊 Unmute' : '🔇 Mute';
+  try { speechSynthesis.cancel(); } catch {}
+  viewer1.classList.remove('speaking');
+  viewer2.classList.remove('speaking');
+});
+
+function stopShare() {
+  if (captureTimer) {
+    clearInterval(captureTimer);
+    captureTimer = null;
+  }
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    try { ws.close(); } catch {}
+  }
+  ws = null;
+  if (stream) {
+    try { stream.getTracks().forEach(t => t.stop()); } catch {}
+  }
+  stream = null;
+  preview.srcObject = null;
+  try { speechSynthesis.cancel(); } catch {}
+  viewer1.classList.remove('speaking');
+  viewer2.classList.remove('speaking');
+  setButtonsState(false);
+}
 
 
