@@ -17,10 +17,14 @@ type Client interface {
 // OpenAIClient implements Client using OpenAI's API.
 type OpenAIClient struct {
 	client *openai.Client
+	model  string
 }
 
-func NewOpenAIClient(apiKey string) *OpenAIClient {
-	return &OpenAIClient{client: openai.NewClient(apiKey)}
+func NewOpenAIClient(apiKey string, model string) *OpenAIClient {
+	if model == "" {
+		model = "gpt-4o"
+	}
+	return &OpenAIClient{client: openai.NewClient(apiKey), model: model}
 }
 
 // GenerateCommentary sends an image to the model and returns XML-tagged dialogue.
@@ -36,7 +40,7 @@ Keep each line under 140 characters. Avoid profanity. Be witty.`
 	// Build content with image
 	// NOTE: Using responses API requires upgraded client; we fall back to ChatCompletions with image_url style
 	req := openai.ChatCompletionRequest{
-		Model: "gpt-4o-mini", // lightweight multimodal
+		Model: c.model,
 		Messages: []openai.ChatCompletionMessage{
 			{
 				Role: openai.ChatMessageRoleUser,

@@ -22,11 +22,12 @@ func main() {
 
 	var aiClient ai.Client
 	apiKey := os.Getenv("OPENAI_API_KEY")
+	model := os.Getenv("OPENAI_MODEL")
 	if apiKey == "" {
 		log.Println("OPENAI_API_KEY not set: running in STUB mode with fake commentary")
 		aiClient = ai.NewStubClient()
 	} else {
-		aiClient = ai.NewOpenAIClient(apiKey)
+		aiClient = ai.NewOpenAIClient(apiKey, model)
 	}
 
 	mux := http.NewServeMux()
