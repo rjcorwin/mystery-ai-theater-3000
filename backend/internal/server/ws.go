@@ -29,7 +29,8 @@ var upgrader = websocket.Upgrader{
 type FrameMessage struct {
 	Type string `json:"type"` // "frame"
 	// PNG data URL or base64 payload
-	ImageBase64 string `json:"imageBase64"`
+	ImageBase64  string `json:"imageBase64"`
+	HistoryCount int    `json:"historyCount"`
 }
 
 // Outgoing commentary
@@ -45,6 +46,9 @@ func (h *Handler) WebsocketHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer conn.Close()
+
+	// Per-connection rolling history of XML assistant outputs
+	var history []string
 
 	// read loop: receive frames, send commentary
 	for {
@@ -62,9 +66,21 @@ func (h *Handler) WebsocketHandler(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
+		// Clamp requested history count (0-100), slice from tail
+		n := msg.HistoryCount
+		if n < 0 {
+			n = 0
+		} else if n > 100 {
+			n = 100
+		}
+		recent := history
+		if n < len(history) {
+			recent = history[len(history)-n:]
+		}
+
 		// call AI with timeout
 		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
-		xml, err := h.ai.GenerateCommentary(ctx, msg.ImageBase64)
+		xml, err := h.ai.GenerateCommentary(ctx, msg.ImageBase64, recent)
 		cancel()
 		if err != nil {
 			log.Println("ai error:", err)
@@ -76,6 +92,12 @@ func (h *Handler) WebsocketHandler(w http.ResponseWriter, r *http.Request) {
 		if err := conn.WriteMessage(websocket.TextMessage, payload); err != nil {
 			log.Println("ws write error:", err)
 			return
+		}
+
+		// append to history and cap to 200 stored
+		history = append(history, xml)
+		if len(history) > 200 {
+			history = history[len(history)-200:]
 		}
 	}
 }

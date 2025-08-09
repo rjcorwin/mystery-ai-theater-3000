@@ -3,6 +3,7 @@ const shareBtn = document.getElementById('shareBtn');
 const stopBtn = document.getElementById('stopBtn');
 const muteBtn = document.getElementById('muteBtn');
 const intervalInput = document.getElementById('intervalInput');
+const historyInput = document.getElementById('historyInput');
 const captureCanvas = document.getElementById('captureCanvas');
 const logEl = document.getElementById('log');
 const viewer1 = document.getElementById('viewer1');
@@ -103,7 +104,8 @@ function captureAndSend() {
       const reader = new FileReader();
       reader.onloadend = () => {
         const base64 = reader.result.split(',')[1];
-        const payload = JSON.stringify({ type: 'frame', imageBase64: base64 });
+        const historyCount = Math.max(0, Math.min(100, Number(historyInput.value) || 0));
+        const payload = JSON.stringify({ type: 'frame', imageBase64: base64, historyCount });
         try { ws.send(payload); } catch {}
       };
       reader.readAsDataURL(blob);
@@ -146,6 +148,8 @@ shareBtn.addEventListener('click', startShare);
 stopBtn.addEventListener('click', stopShare);
 intervalInput.addEventListener('change', scheduleCapture);
 intervalInput.addEventListener('input', scheduleCapture);
+historyInput.addEventListener('change', () => {});
+historyInput.addEventListener('input', () => {});
 muteBtn.addEventListener('click', () => {
   isMuted = !isMuted;
   muteBtn.textContent = isMuted ? '🔊 Unmute' : '🔇 Mute';

@@ -11,7 +11,7 @@ import (
 
 // Client is the interface the server uses for generating commentary.
 type Client interface {
-	GenerateCommentary(ctx context.Context, pngBase64 string) (string, error)
+	GenerateCommentary(ctx context.Context, pngBase64 string, history []string) (string, error)
 }
 
 // OpenAIClient implements Client using OpenAI's API.
@@ -29,32 +29,29 @@ func NewOpenAIClient(apiKey string, model string) *OpenAIClient {
 
 // GenerateCommentary sends an image to the model and returns XML-tagged dialogue.
 // The output is expected to include <viewer-1> and <viewer-2> tags.
-func (c *OpenAIClient) GenerateCommentary(ctx context.Context, pngBase64 string) (string, error) {
-	// Construct a vision prompt
-	prompt := `You are two snarky robots watching a human play a video game. 
+func (c *OpenAIClient) GenerateCommentary(ctx context.Context, pngBase64 string, history []string) (string, error) {
+	// System guidance
+	prompt := `You are two snarky robots watching a human play a video game.
 Return short, funny, helpful commentary as XML with exactly two speakers:
 <viewer-1>...</viewer-1>
 <viewer-2>...</viewer-2>
 Keep each line under 140 characters. Avoid profanity. Be witty.`
 
-	// Build content with image
-	// NOTE: Using responses API requires upgraded client; we fall back to ChatCompletions with image_url style
-	req := openai.ChatCompletionRequest{
-		Model: c.model,
-		Messages: []openai.ChatCompletionMessage{
-			{
-				Role: openai.ChatMessageRoleUser,
-				MultiContent: []openai.ChatMessagePart{
-					{Type: openai.ChatMessagePartTypeText, Text: prompt},
-					{
-						Type:     openai.ChatMessagePartTypeImageURL,
-						ImageURL: &openai.ChatMessageImageURL{URL: "data:image/png;base64," + pngBase64},
-					},
-				},
-			},
-		},
-		Temperature: 0.8,
+	// Build message list: system + prior assistant XMLs + current user (text + image)
+	msgs := make([]openai.ChatCompletionMessage, 0, len(history)+2)
+	msgs = append(msgs, openai.ChatCompletionMessage{Role: openai.ChatMessageRoleSystem, Content: prompt})
+	for _, prev := range history {
+		msgs = append(msgs, openai.ChatCompletionMessage{Role: openai.ChatMessageRoleAssistant, Content: prev})
 	}
+	msgs = append(msgs, openai.ChatCompletionMessage{
+		Role: openai.ChatMessageRoleUser,
+		MultiContent: []openai.ChatMessagePart{
+			{Type: openai.ChatMessagePartTypeText, Text: "Analyze the next frame and respond as XML for both viewers."},
+			{Type: openai.ChatMessagePartTypeImageURL, ImageURL: &openai.ChatMessageImageURL{URL: "data:image/png;base64," + pngBase64}},
+		},
+	})
+
+	req := openai.ChatCompletionRequest{Model: c.model, Messages: msgs, Temperature: 0.8}
 
 	resp, err := c.client.CreateChatCompletion(ctx, req)
 	if err != nil {
@@ -71,7 +68,7 @@ type StubClient struct{}
 
 func NewStubClient() *StubClient { return &StubClient{} }
 
-func (s *StubClient) GenerateCommentary(ctx context.Context, pngBase64 string) (string, error) {
+func (s *StubClient) GenerateCommentary(ctx context.Context, pngBase64 string, history []string) (string, error) {
 	// light time-based variation so it doesn't look static
 	t := time.Now().UnixNano()
 	v1 := "<viewer-1>Did they bind the jump key to a tea break?</viewer-1>"
