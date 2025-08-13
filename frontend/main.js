@@ -4,6 +4,9 @@ const stopBtn = document.getElementById('stopBtn');
 const muteBtn = document.getElementById('muteBtn');
 const intervalInput = document.getElementById('intervalInput');
 const historyInput = document.getElementById('historyInput');
+const modeSelect = document.getElementById('modeSelect');
+const commentNowBtn = document.getElementById('commentNowBtn');
+const commentStatus = document.getElementById('commentStatus');
 const captureCanvas = document.getElementById('captureCanvas');
 const logEl = document.getElementById('log');
 const viewer1 = document.getElementById('viewer1');
@@ -35,6 +38,7 @@ let ws = null;
 let captureTimer = null;
 let isMuted = false;
 let voices = [];
+let mode = 'interval';
 
 const LS_KEYS = {
   voice1: 'mit3k.voice1',
@@ -44,7 +48,8 @@ const LS_KEYS = {
   rate1: 'mit3k.rate1',
   rate2: 'mit3k.rate2',
   history: 'mit3k.history',
-  interval: 'mit3k.interval'
+	interval: 'mit3k.interval',
+	mode: 'mit3k.mode'
 };
 
 function setButtonsState(capturing) {
@@ -121,8 +126,10 @@ async function startShare() {
 
 function scheduleCapture() {
   if (captureTimer) clearInterval(captureTimer);
-  const interval = Math.max(500, Number(intervalInput.value) || 2500);
-  captureTimer = setInterval(captureAndSend, interval);
+  if (mode === 'interval') {
+    const interval = Math.max(500, Number(intervalInput.value) || 2500);
+    captureTimer = setInterval(captureAndSend, interval);
+  }
 }
 
 function captureAndSend() {
@@ -166,6 +173,11 @@ function openSocket() {
   };
   ws.onclose = () => {
     appendLine('System', 'Disconnected.');
+    if (commentStatus.dataset.busy === '1') {
+      commentStatus.textContent = '';
+      commentStatus.dataset.busy = '0';
+      commentNowBtn.disabled = mode !== 'manual';
+    }
   };
   ws.onerror = (e) => {
     console.error('ws error', e);
@@ -180,6 +192,11 @@ function openSocket() {
           appendLine(`Viewer ${who}`, text);
           speak(text, who);
         });
+        if (commentStatus.dataset.busy === '1') {
+          commentStatus.textContent = '';
+          commentStatus.dataset.busy = '0';
+          commentNowBtn.disabled = mode !== 'manual';
+        }
       }
     } catch (err) {
       console.error('bad message', err);
@@ -193,6 +210,19 @@ intervalInput.addEventListener('change', scheduleCapture);
 intervalInput.addEventListener('input', scheduleCapture);
 historyInput.addEventListener('change', () => {});
 historyInput.addEventListener('input', () => {});
+modeSelect.addEventListener('change', () => {
+  mode = modeSelect.value;
+  commentNowBtn.disabled = mode !== 'manual';
+  scheduleCapture();
+});
+commentNowBtn.addEventListener('click', () => {
+  if (mode !== 'manual') return;
+  // give immediate UI feedback
+  commentNowBtn.disabled = true;
+  commentStatus.textContent = 'Waiting for commentary…';
+  commentStatus.dataset.busy = '1';
+  captureAndSend();
+});
 muteBtn.addEventListener('click', () => {
   isMuted = !isMuted;
   muteBtn.textContent = isMuted ? '🔊 Unmute' : '🔇 Mute';
@@ -318,6 +348,12 @@ function loadPersisted() {
   if (h) historyInput.value = h;
   const it = localStorage.getItem(LS_KEYS.interval);
   if (it) intervalInput.value = it;
+	const m = localStorage.getItem(LS_KEYS.mode);
+	if (m === 'manual' || m === 'interval') {
+		mode = m;
+		if (modeSelect) modeSelect.value = m;
+		if (commentNowBtn) commentNowBtn.disabled = mode !== 'manual';
+	}
   const p1 = localStorage.getItem(LS_KEYS.pitch1); if (p1) voice1Pitch.value = p1;
   const p2 = localStorage.getItem(LS_KEYS.pitch2); if (p2) voice2Pitch.value = p2;
   const r1 = localStorage.getItem(LS_KEYS.rate1); if (r1) voice1Rate.value = r1;
@@ -335,6 +371,7 @@ function loadPersisted() {
 function persistLive() {
   historyInput.addEventListener('input', () => localStorage.setItem(LS_KEYS.history, historyInput.value));
   intervalInput.addEventListener('input', () => localStorage.setItem(LS_KEYS.interval, intervalInput.value));
+	modeSelect.addEventListener('change', () => localStorage.setItem(LS_KEYS.mode, modeSelect.value));
   voice1Pitch.addEventListener('input', () => { voice1PitchVal.textContent = voice1Pitch.value; localStorage.setItem(LS_KEYS.pitch1, voice1Pitch.value); });
   voice2Pitch.addEventListener('input', () => { voice2PitchVal.textContent = voice2Pitch.value; localStorage.setItem(LS_KEYS.pitch2, voice2Pitch.value); });
   voice1Rate.addEventListener('input', () => { voice1RateVal.textContent = voice1Rate.value; localStorage.setItem(LS_KEYS.rate1, voice1Rate.value); });

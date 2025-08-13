@@ -14,6 +14,15 @@
         <button id="stopBtn" disabled>Stop Share</button>
         <button id="muteBtn">🔇 Mute</button>
         <label>
+          Mode
+          <select id="modeSelect">
+            <option value="interval" selected>Interval</option>
+            <option value="manual">Manual</option>
+          </select>
+        </label>
+        <button id="commentNowBtn" class="secondary" disabled>Comment Now</button>
+        <span id="commentStatus" class="status"></span>
+        <label>
           Interval (ms)
           <input id="intervalInput" type="number" min="500" step="100" value="2500" />
         </label>
