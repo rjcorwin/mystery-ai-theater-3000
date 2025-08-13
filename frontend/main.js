@@ -32,6 +32,7 @@ const voiceRefresh = document.getElementById('voiceRefresh');
 const settingsToggle = document.getElementById('settingsToggle');
 const settingsDrawer = document.getElementById('settingsDrawer');
 const drawerToggle = document.getElementById('drawerToggle');
+const miniToggle = document.getElementById('miniToggle');
 
 let stream = null;
 let ws = null;
@@ -49,7 +50,8 @@ const LS_KEYS = {
   rate2: 'mit3k.rate2',
   history: 'mit3k.history',
 	interval: 'mit3k.interval',
-	mode: 'mit3k.mode'
+	mode: 'mit3k.mode',
+	mini: 'mit3k.mini'
 };
 
 function setButtonsState(capturing) {
@@ -366,6 +368,9 @@ function loadPersisted() {
   voice2RateVal.textContent = voice2Rate.value;
   voice1VolVal.textContent = Number(voice1Vol.value).toFixed(2);
   voice2VolVal.textContent = Number(voice2Vol.value).toFixed(2);
+	const mini = localStorage.getItem(LS_KEYS.mini) === '1';
+	document.documentElement.classList.toggle('mini', mini);
+	if (miniToggle) miniToggle.textContent = mini ? 'Exit Mini' : 'Mini Mode';
 }
 
 function persistLive() {
@@ -414,6 +419,14 @@ function setDrawer(open) {
 let drawerOpen = false;
 settingsToggle.addEventListener('click', () => { drawerOpen = !drawerOpen; setDrawer(drawerOpen); });
 drawerToggle.addEventListener('click', () => { drawerOpen = !drawerOpen; setDrawer(drawerOpen); });
+
+// Mini mode toggle
+miniToggle.addEventListener('click', () => {
+  const next = !document.documentElement.classList.contains('mini');
+  document.documentElement.classList.toggle('mini', next);
+  miniToggle.textContent = next ? 'Exit Mini' : 'Mini Mode';
+  localStorage.setItem(LS_KEYS.mini, next ? '1' : '0');
+});
 
 // Manual refresh and focus refresh
 voiceRefresh.addEventListener('click', async () => {
