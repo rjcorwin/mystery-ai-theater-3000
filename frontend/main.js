@@ -1,12 +1,14 @@
 const preview = document.getElementById('preview');
 const shareBtn = document.getElementById('shareBtn');
 const stopBtn = document.getElementById('stopBtn');
+const pauseBtn = document.getElementById('pauseBtn');
 const muteBtn = document.getElementById('muteBtn');
 const intervalInput = document.getElementById('intervalInput');
 const historyInput = document.getElementById('historyInput');
 const modeSelect = document.getElementById('modeSelect');
 const commentNowBtn = document.getElementById('commentNowBtn');
 const commentStatus = document.getElementById('commentStatus');
+const hidePreviewChk = document.getElementById('hidePreviewChk');
 const captureCanvas = document.getElementById('captureCanvas');
 const logEl = document.getElementById('log');
 const viewer1 = document.getElementById('viewer1');
@@ -40,6 +42,7 @@ let captureTimer = null;
 let isMuted = false;
 let voices = [];
 let mode = 'interval';
+let capturePaused = false;
 
 const LS_KEYS = {
   voice1: 'mit3k.voice1',
@@ -57,6 +60,7 @@ const LS_KEYS = {
 function setButtonsState(capturing) {
   shareBtn.disabled = !!capturing;
   stopBtn.disabled = !capturing;
+  if (pauseBtn) pauseBtn.disabled = !capturing;
 }
 
 function appendLine(who, text) {
@@ -117,6 +121,8 @@ async function startShare() {
       audio: false,
     });
     preview.srcObject = stream;
+    // apply current hide/show preference
+    if (hidePreviewChk) preview.style.display = hidePreviewChk.checked ? 'none' : '';
     openSocket();
     scheduleCapture();
     setButtonsState(true);
@@ -128,13 +134,14 @@ async function startShare() {
 
 function scheduleCapture() {
   if (captureTimer) clearInterval(captureTimer);
-  if (mode === 'interval') {
+  if (mode === 'interval' && !capturePaused) {
     const interval = Math.max(500, Number(intervalInput.value) || 2500);
     captureTimer = setInterval(captureAndSend, interval);
   }
 }
 
 function captureAndSend() {
+  if (capturePaused) return;
   if (!stream || !ws || ws.readyState !== WebSocket.OPEN) return;
   const track = stream.getVideoTracks()[0];
   if (!track) return;
@@ -180,6 +187,9 @@ function openSocket() {
       commentStatus.dataset.busy = '0';
       commentNowBtn.disabled = mode !== 'manual';
     }
+    // Reset pause button if stream ends elsewhere
+    capturePaused = false;
+    if (pauseBtn) pauseBtn.textContent = 'Pause Capture';
   };
   ws.onerror = (e) => {
     console.error('ws error', e);
@@ -208,6 +218,13 @@ function openSocket() {
 
 shareBtn.addEventListener('click', async () => { await ensureVoicesLoaded(true); startShare(); });
 stopBtn.addEventListener('click', stopShare);
+if (pauseBtn) {
+  pauseBtn.addEventListener('click', () => {
+    capturePaused = !capturePaused;
+    pauseBtn.textContent = capturePaused ? 'Resume Capture' : 'Pause Capture';
+    scheduleCapture();
+  });
+}
 intervalInput.addEventListener('change', scheduleCapture);
 intervalInput.addEventListener('input', scheduleCapture);
 historyInput.addEventListener('change', () => {});
@@ -399,6 +416,13 @@ voice2Test.addEventListener('click', async () => { await ensureVoicesLoaded(true
 loadPersisted();
 (async () => { await ensureVoicesLoaded(false); })();
 persistLive();
+// honor initial hide preview state on load
+if (hidePreviewChk) {
+  document.documentElement.classList.toggle('no-stage', hidePreviewChk.checked);
+  hidePreviewChk.addEventListener('change', () => {
+    document.documentElement.classList.toggle('no-stage', hidePreviewChk.checked);
+  });
+}
 
 // Manual refresh and focus refresh for voices
 voiceRefresh.addEventListener('click', async () => {

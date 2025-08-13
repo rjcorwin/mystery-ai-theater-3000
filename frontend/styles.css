@@ -37,6 +37,7 @@ button {
 button:hover { filter: brightness(1.1); }
 button:disabled { opacity: 0.6; cursor: not-allowed; }
 .status { margin-left: 8px; color: #9fb4ff; font-size: 14px; }
+label.inline { display: inline-flex; align-items: center; gap: 6px; }
 
 main {
   display: grid;
@@ -52,6 +53,10 @@ main {
 .mini .drawer { border-top: 1px solid #1a223a; }
 .mini header { flex-wrap: wrap; }
 .mini #commentStatus { flex-basis: 100%; margin-top: 6px; }
+
+/* Hide-stage mode: collapse theater and give log full width */
+.no-stage main { grid-template-columns: 1fr; }
+.no-stage .stage { display: none !important; }
 
 .drawer {
   position: fixed;

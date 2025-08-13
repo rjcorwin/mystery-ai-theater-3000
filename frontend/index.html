@@ -12,6 +12,7 @@
         <h1>Mystery AI Theater 3000</h1>
         <button id="shareBtn">Share Game Window</button>
         <button id="stopBtn" disabled>Stop Share</button>
+        <button id="pauseBtn" class="secondary" disabled>Pause Capture</button>
         <button id="muteBtn">🔇 Mute</button>
         <label>
           Mode
@@ -22,6 +23,9 @@
         </label>
         <button id="commentNowBtn" class="secondary" disabled>Comment Now</button>
         <span id="commentStatus" class="status"></span>
+        <label class="inline">
+          <input id="hidePreviewChk" type="checkbox" /> Hide preview
+        </label>
         <button id="miniToggle" class="secondary" title="Toggle mini layout">Mini Mode</button>
         <label>
           Interval (ms)
