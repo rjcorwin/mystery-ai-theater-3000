@@ -8,34 +8,37 @@
   </head>
   <body>
     <div id="app">
-      <header>
+      <header id="appHeader">
+        <button id="miniHeaderToggle" class="secondary" title="Show or hide the toolbar" aria-expanded="true" style="order:-1">Hide Toolbar ▾</button>
         <h1>Mystery AI Theater 3000</h1>
-        <button id="shareBtn">Share Game Window</button>
-        <button id="stopBtn" disabled>Stop Share</button>
-        <button id="pauseBtn" class="secondary" disabled>Pause Capture</button>
-        <button id="muteBtn">🔇 Mute</button>
-        <label>
-          Mode
-          <select id="modeSelect">
-            <option value="interval" selected>Interval</option>
-            <option value="manual">Manual</option>
-          </select>
-        </label>
-        <button id="commentNowBtn" class="secondary" disabled>Comment Now</button>
-        <span id="commentStatus" class="status"></span>
-        <label class="inline">
-          <input id="hidePreviewChk" type="checkbox" /> Hide preview
-        </label>
-        <button id="miniToggle" class="secondary" title="Toggle mini layout">Mini Mode</button>
-        <label>
-          Interval (ms)
-          <input id="intervalInput" type="number" min="500" step="100" value="2500" />
-        </label>
-        <label>
-          History (0–100)
-          <input id="historyInput" type="number" min="0" max="100" step="1" value="10" />
-        </label>
-        <button id="settingsToggle" class="secondary">Voice Settings</button>
+        <div class="header-controls">
+          <button id="shareBtn">Share Game Window</button>
+          <button id="stopBtn" disabled>Stop Share</button>
+          <button id="pauseBtn" class="secondary" disabled>Pause Capture</button>
+          <button id="muteBtn">🔇 Mute</button>
+          <label>
+            Mode
+            <select id="modeSelect">
+              <option value="interval" selected>Interval</option>
+              <option value="manual">Manual</option>
+            </select>
+          </label>
+          <button id="commentNowBtn" class="secondary" disabled>Comment Now</button>
+          <span id="commentStatus" class="status"></span>
+          <label class="inline">
+            <input id="hidePreviewChk" type="checkbox" /> Hide preview
+          </label>
+          <button id="miniToggle" class="secondary" title="Toggle mini layout">Mini Mode</button>
+          <label>
+            Interval (ms)
+            <input id="intervalInput" type="number" min="500" step="100" value="2500" />
+          </label>
+          <label>
+            History (0–100)
+            <input id="historyInput" type="number" min="0" max="100" step="1" value="10" />
+          </label>
+          <button id="settingsToggle" class="secondary">Voice Settings</button>
+        </div>
       </header>
 
       <main>

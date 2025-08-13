@@ -18,7 +18,12 @@ header {
   align-items: center;
   padding: 12px 16px;
   border-bottom: 1px solid #1a223a;
+  flex-wrap: wrap;
 }
+.mini .header-collapsed .header-controls { display: none; }
+.header-controls { display: contents; }
+.mini #miniHeaderToggle { display: inline-block; }
+.header-collapsed #miniHeaderToggle { background: #2a3a64; }
 
 header h1 {
   margin: 0 16px 0 0;

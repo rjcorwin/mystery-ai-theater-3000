@@ -35,6 +35,8 @@ const settingsToggle = document.getElementById('settingsToggle');
 const settingsDrawer = document.getElementById('settingsDrawer');
 const drawerToggle = document.getElementById('drawerToggle');
 const miniToggle = document.getElementById('miniToggle');
+const miniHeaderToggle = document.getElementById('miniHeaderToggle');
+const appHeader = document.getElementById('appHeader');
 
 let stream = null;
 let ws = null;
@@ -450,6 +452,14 @@ miniToggle.addEventListener('click', () => {
   document.documentElement.classList.toggle('mini', next);
   miniToggle.textContent = next ? 'Exit Mini' : 'Mini Mode';
   localStorage.setItem(LS_KEYS.mini, next ? '1' : '0');
+});
+
+// Collapse header controls in mini mode
+miniHeaderToggle.addEventListener('click', () => {
+  appHeader.classList.toggle('header-collapsed');
+  const collapsed = appHeader.classList.contains('header-collapsed');
+  miniHeaderToggle.textContent = collapsed ? 'Show Toolbar ▸' : 'Hide Toolbar ▾';
+  miniHeaderToggle.setAttribute('aria-expanded', String(!collapsed));
 });
 
 // Manual refresh and focus refresh

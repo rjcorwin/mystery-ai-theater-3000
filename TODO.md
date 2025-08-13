@@ -5,4 +5,5 @@
 - [x] 1.6 A new mode where the robots comment not on interval, but on button push.
 - [x] 2. option in ui to turn off or put screenshare
 - [x] 2.1 mini mode above the chat. Actually, mini mode the whole UI turns into a one-column layout so we can just.
+- [x] 2.2 When in mini mode, the UI at the top takes a lot of screen real estate. Maybe collapse it, into a drawer? Your call. Be creative.
 - [ ] 4. Let's have the human user be able to send a chat message to the bots.
