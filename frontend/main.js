@@ -8,11 +8,44 @@ const captureCanvas = document.getElementById('captureCanvas');
 const logEl = document.getElementById('log');
 const viewer1 = document.getElementById('viewer1');
 const viewer2 = document.getElementById('viewer2');
+// Voice controls
+const voice1Select = document.getElementById('voice1Select');
+const voice2Select = document.getElementById('voice2Select');
+const voice1Pitch = document.getElementById('voice1Pitch');
+const voice2Pitch = document.getElementById('voice2Pitch');
+const voice1Rate = document.getElementById('voice1Rate');
+const voice2Rate = document.getElementById('voice2Rate');
+const voice1PitchVal = document.getElementById('voice1PitchVal');
+const voice2PitchVal = document.getElementById('voice2PitchVal');
+const voice1RateVal = document.getElementById('voice1RateVal');
+const voice2RateVal = document.getElementById('voice2RateVal');
+const voice1Vol = document.getElementById('voice1Vol');
+const voice2Vol = document.getElementById('voice2Vol');
+const voice1VolVal = document.getElementById('voice1VolVal');
+const voice2VolVal = document.getElementById('voice2VolVal');
+const voice1Test = document.getElementById('voice1Test');
+const voice2Test = document.getElementById('voice2Test');
+const voiceRefresh = document.getElementById('voiceRefresh');
+const settingsToggle = document.getElementById('settingsToggle');
+const settingsDrawer = document.getElementById('settingsDrawer');
+const drawerToggle = document.getElementById('drawerToggle');
 
 let stream = null;
 let ws = null;
 let captureTimer = null;
 let isMuted = false;
+let voices = [];
+
+const LS_KEYS = {
+  voice1: 'mit3k.voice1',
+  voice2: 'mit3k.voice2',
+  pitch1: 'mit3k.pitch1',
+  pitch2: 'mit3k.pitch2',
+  rate1: 'mit3k.rate1',
+  rate2: 'mit3k.rate2',
+  history: 'mit3k.history',
+  interval: 'mit3k.interval'
+};
 
 function setButtonsState(capturing) {
   shareBtn.disabled = !!capturing;
@@ -33,12 +66,22 @@ function appendLine(who, text) {
   logEl.scrollTop = logEl.scrollHeight;
 }
 
+function resolveVoice(which) {
+  const sel = which === 1 ? voice1Select : voice2Select;
+  const name = sel?.value;
+  if (!name) return null;
+  return voices.find(v => v.name === name) || null;
+}
+
 function speak(text, which) {
   if (isMuted) return;
   if (!('speechSynthesis' in window)) return;
   const utter = new SpeechSynthesisUtterance(text);
-  utter.rate = 1.1;
-  utter.pitch = which === 1 ? 1.2 : 0.9;
+  const v = resolveVoice(which);
+  if (v) utter.voice = v;
+  utter.rate = which === 1 ? Number(voice1Rate.value || 1.1) : Number(voice2Rate.value || 1.1);
+  utter.pitch = which === 1 ? Number(voice1Pitch.value || 1.2) : Number(voice2Pitch.value || 0.9);
+  utter.volume = which === 1 ? Number(voice1Vol.value || 1.0) : Number(voice2Vol.value || 1.0);
   utter.onstart = () => {
     (which === 1 ? viewer1 : viewer2).classList.add('speaking');
   };
@@ -144,7 +187,7 @@ function openSocket() {
   };
 }
 
-shareBtn.addEventListener('click', startShare);
+shareBtn.addEventListener('click', async () => { await ensureVoicesLoaded(true); startShare(); });
 stopBtn.addEventListener('click', stopShare);
 intervalInput.addEventListener('change', scheduleCapture);
 intervalInput.addEventListener('input', scheduleCapture);
@@ -177,5 +220,174 @@ function stopShare() {
   viewer2.classList.remove('speaking');
   setButtonsState(false);
 }
+
+// Voice population and persistence
+function populateVoices() {
+  voices = speechSynthesis.getVoices() || [];
+  const opts = voices.map(v => {
+    const o = document.createElement('option');
+    o.value = v.name;
+    o.textContent = `${v.name} (${v.lang})${v.default ? ' • default' : ''}`;
+    return o;
+  });
+  [voice1Select, voice2Select].forEach((sel, idx) => {
+    if (!sel) return;
+    const prev = localStorage.getItem(idx === 0 ? LS_KEYS.voice1 : LS_KEYS.voice2);
+    sel.innerHTML = '';
+    if (opts.length) {
+      opts.forEach(o => sel.appendChild(o.cloneNode(true)));
+    } else {
+      const placeholder = document.createElement('option');
+      placeholder.value = '';
+      placeholder.textContent = '(No voices found)';
+      sel.appendChild(placeholder);
+    }
+    let chosen = prev;
+    if (!chosen || !Array.from(sel.options).some(o => o.value === chosen)) {
+      // pick defaults: try default voice for first, a different one for second
+      if (voices.length > 0) {
+        if (idx === 0) {
+          const def = voices.find(v => v.default) || voices[0];
+          chosen = def.name;
+        } else {
+          const def = voices.find(v => v.default);
+          const alt = voices.find(v => !def || v.name !== def.name) || voices[0];
+          chosen = alt.name;
+        }
+      }
+    }
+    if (chosen) sel.value = chosen;
+    localStorage.setItem(idx === 0 ? LS_KEYS.voice1 : LS_KEYS.voice2, sel.value || '');
+  });
+}
+
+function waitForVoices(maxWaitMs = 10000) {
+  return new Promise((resolve) => {
+    const start = Date.now();
+    function check() {
+      const list = speechSynthesis.getVoices();
+      if (list && list.length) {
+        voices = list;
+        resolve(list);
+        return;
+      }
+      if (Date.now() - start > maxWaitMs) {
+        resolve(list || []);
+        return;
+      }
+      setTimeout(check, 100);
+    }
+    // attach event as well
+    const onChange = () => {
+      const list = speechSynthesis.getVoices();
+      if (list && list.length) {
+        voices = list;
+        speechSynthesis.onvoiceschanged = null;
+        resolve(list);
+      }
+    };
+    if ('speechSynthesis' in window) {
+      speechSynthesis.onvoiceschanged = onChange;
+    }
+    // trigger
+    check();
+  });
+}
+
+function primeSpeechEngine() {
+  try {
+    const u = new SpeechSynthesisUtterance('.')
+    u.volume = 0;
+    u.rate = 1;
+    u.pitch = 1;
+    speechSynthesis.speak(u);
+    setTimeout(() => { try { speechSynthesis.cancel(); } catch {} }, 150);
+  } catch {}
+}
+
+async function ensureVoicesLoaded(force = false) {
+  if (voices && voices.length) return true;
+  if (force) primeSpeechEngine();
+  await waitForVoices(10000);
+  populateVoices();
+  return voices.length > 0;
+}
+
+function loadPersisted() {
+  const h = localStorage.getItem(LS_KEYS.history);
+  if (h) historyInput.value = h;
+  const it = localStorage.getItem(LS_KEYS.interval);
+  if (it) intervalInput.value = it;
+  const p1 = localStorage.getItem(LS_KEYS.pitch1); if (p1) voice1Pitch.value = p1;
+  const p2 = localStorage.getItem(LS_KEYS.pitch2); if (p2) voice2Pitch.value = p2;
+  const r1 = localStorage.getItem(LS_KEYS.rate1); if (r1) voice1Rate.value = r1;
+  const r2 = localStorage.getItem(LS_KEYS.rate2); if (r2) voice2Rate.value = r2;
+  const v1 = localStorage.getItem('mit3k.vol1'); if (v1) voice1Vol.value = v1;
+  const v2 = localStorage.getItem('mit3k.vol2'); if (v2) voice2Vol.value = v2;
+  voice1PitchVal.textContent = voice1Pitch.value;
+  voice2PitchVal.textContent = voice2Pitch.value;
+  voice1RateVal.textContent = voice1Rate.value;
+  voice2RateVal.textContent = voice2Rate.value;
+  voice1VolVal.textContent = Number(voice1Vol.value).toFixed(2);
+  voice2VolVal.textContent = Number(voice2Vol.value).toFixed(2);
+}
+
+function persistLive() {
+  historyInput.addEventListener('input', () => localStorage.setItem(LS_KEYS.history, historyInput.value));
+  intervalInput.addEventListener('input', () => localStorage.setItem(LS_KEYS.interval, intervalInput.value));
+  voice1Pitch.addEventListener('input', () => { voice1PitchVal.textContent = voice1Pitch.value; localStorage.setItem(LS_KEYS.pitch1, voice1Pitch.value); });
+  voice2Pitch.addEventListener('input', () => { voice2PitchVal.textContent = voice2Pitch.value; localStorage.setItem(LS_KEYS.pitch2, voice2Pitch.value); });
+  voice1Rate.addEventListener('input', () => { voice1RateVal.textContent = voice1Rate.value; localStorage.setItem(LS_KEYS.rate1, voice1Rate.value); });
+  voice2Rate.addEventListener('input', () => { voice2RateVal.textContent = voice2Rate.value; localStorage.setItem(LS_KEYS.rate2, voice2Rate.value); });
+  voice1Select.addEventListener('change', () => localStorage.setItem(LS_KEYS.voice1, voice1Select.value));
+  voice2Select.addEventListener('change', () => localStorage.setItem(LS_KEYS.voice2, voice2Select.value));
+  voice1Vol.addEventListener('input', () => { voice1VolVal.textContent = Number(voice1Vol.value).toFixed(2); localStorage.setItem('mit3k.vol1', voice1Vol.value); });
+  voice2Vol.addEventListener('input', () => { voice2VolVal.textContent = Number(voice2Vol.value).toFixed(2); localStorage.setItem('mit3k.vol2', voice2Vol.value); });
+}
+
+function testVoice(which) {
+  const text = which === 1 ? 'Viewer one, systems nominal.' : 'Viewer two, sarcasm thrusters online.';
+  speak(text, which);
+}
+
+voice1Test.addEventListener('click', async () => { await ensureVoicesLoaded(true); testVoice(1); });
+voice2Test.addEventListener('click', async () => { await ensureVoicesLoaded(true); testVoice(2); });
+
+// initialize
+loadPersisted();
+(async () => { await ensureVoicesLoaded(false); })();
+persistLive();
+
+// Manual refresh and focus refresh for voices
+voiceRefresh.addEventListener('click', async () => {
+  await ensureVoicesLoaded(true);
+  populateVoices();
+});
+
+window.addEventListener('focus', async () => {
+  await ensureVoicesLoaded(false);
+  populateVoices();
+});
+
+// Drawer/collapsible controls
+function setDrawer(open) {
+  settingsDrawer.classList.toggle('collapsed', !open);
+  drawerToggle.textContent = open ? 'Collapse' : 'Expand';
+}
+let drawerOpen = false;
+settingsToggle.addEventListener('click', () => { drawerOpen = !drawerOpen; setDrawer(drawerOpen); });
+drawerToggle.addEventListener('click', () => { drawerOpen = !drawerOpen; setDrawer(drawerOpen); });
+
+// Manual refresh and focus refresh
+voiceRefresh.addEventListener('click', async () => {
+  primeSpeechEngine();
+  await new Promise(r => setTimeout(r, 200));
+  voices = speechSynthesis.getVoices() || [];
+  populateVoices();
+});
+window.addEventListener('focus', async () => {
+  voices = speechSynthesis.getVoices() || voices;
+  populateVoices();
+});
 
 

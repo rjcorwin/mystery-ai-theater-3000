@@ -21,6 +21,7 @@
           History (0–100)
           <input id="historyInput" type="number" min="0" max="100" step="1" value="10" />
         </label>
+        <button id="settingsToggle" class="secondary">Voice Settings</button>
       </header>
 
       <main>
@@ -38,6 +39,59 @@
           <div id="log"></div>
         </section>
       </main>
+
+    <!-- Bottom drawer: collapsible voice settings -->
+    <div id="settingsDrawer" class="drawer collapsed">
+      <div class="drawer-bar">
+        <strong>Voice Settings</strong>
+        <div class="spacer"></div>
+        <button id="drawerToggle" class="secondary">Expand</button>
+      </div>
+      <div class="drawer-content">
+        <div class="panel">
+          <h2>Voice Settings <button id="voiceRefresh" class="secondary" style="margin-left:8px">Refresh Voices</button></h2>
+          <div class="voice-row">
+            <div class="voice-title">Viewer 1</div>
+            <label>Voice
+              <select id="voice1Select"></select>
+            </label>
+            <label>Pitch
+              <input id="voice1Pitch" type="range" min="0.5" max="2" step="0.1" value="1.2" />
+              <span id="voice1PitchVal">1.2</span>
+            </label>
+            <label>Rate
+              <input id="voice1Rate" type="range" min="0.5" max="2" step="0.1" value="1.1" />
+              <span id="voice1RateVal">1.1</span>
+            </label>
+            <label>Volume
+              <input id="voice1Vol" type="range" min="0" max="1" step="0.05" value="1" />
+              <span id="voice1VolVal">1.0</span>
+            </label>
+            <button id="voice1Test" class="secondary">Test</button>
+          </div>
+
+          <div class="voice-row">
+            <div class="voice-title">Viewer 2</div>
+            <label>Voice
+              <select id="voice2Select"></select>
+            </label>
+            <label>Pitch
+              <input id="voice2Pitch" type="range" min="0.5" max="2" step="0.1" value="0.9" />
+              <span id="voice2PitchVal">0.9</span>
+            </label>
+            <label>Rate
+              <input id="voice2Rate" type="range" min="0.5" max="2" step="0.1" value="1.1" />
+              <span id="voice2RateVal">1.1</span>
+            </label>
+            <label>Volume
+              <input id="voice2Vol" type="range" min="0" max="1" step="0.05" value="1" />
+              <span id="voice2VolVal">1.0</span>
+            </label>
+            <button id="voice2Test" class="secondary">Test</button>
+          </div>
+        </div>
+      </div>
+    </div>
     </div>
 
     <script type="module" src="/main.js"></script>
