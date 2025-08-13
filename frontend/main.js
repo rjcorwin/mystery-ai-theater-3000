@@ -79,6 +79,14 @@ function appendLine(who, text) {
   logEl.scrollTop = logEl.scrollHeight;
 }
 
+// Ensure the chat stays pinned to bottom whenever content is added/resized
+function scrollLogToBottom() {
+  if (!logEl) return;
+  requestAnimationFrame(() => {
+    logEl.scrollTop = logEl.scrollHeight;
+  });
+}
+
 function resolveVoice(which) {
   const sel = which === 1 ? voice1Select : voice2Select;
   const name = sel?.value;
@@ -205,6 +213,7 @@ function openSocket() {
         lines.forEach(({ who, text }) => {
           appendLine(`Viewer ${who}`, text);
           speak(text, who);
+          scrollLogToBottom();
         });
         if (commentStatus.dataset.busy === '1') {
           commentStatus.textContent = '';
@@ -443,8 +452,12 @@ function setDrawer(open) {
   drawerToggle.textContent = open ? 'Collapse' : 'Expand';
 }
 let drawerOpen = false;
-settingsToggle.addEventListener('click', () => { drawerOpen = !drawerOpen; setDrawer(drawerOpen); });
-drawerToggle.addEventListener('click', () => { drawerOpen = !drawerOpen; setDrawer(drawerOpen); });
+if (settingsToggle) {
+  settingsToggle.addEventListener('click', () => { drawerOpen = !drawerOpen; setDrawer(drawerOpen); });
+}
+if (drawerToggle) {
+  drawerToggle.addEventListener('click', () => { drawerOpen = !drawerOpen; setDrawer(drawerOpen); });
+}
 
 // Mini mode toggle
 miniToggle.addEventListener('click', () => {
@@ -455,11 +468,11 @@ miniToggle.addEventListener('click', () => {
 });
 
 // Collapse header controls in mini mode
+// Header emoji toggles the top Button Drawer
 miniHeaderToggle.addEventListener('click', () => {
-  appHeader.classList.toggle('header-collapsed');
-  const collapsed = appHeader.classList.contains('header-collapsed');
-  miniHeaderToggle.textContent = collapsed ? 'Show Toolbar ▸' : 'Hide Toolbar ▾';
-  miniHeaderToggle.setAttribute('aria-expanded', String(!collapsed));
+  drawerOpen = !drawerOpen;
+  setDrawer(drawerOpen);
+  miniHeaderToggle.setAttribute('aria-expanded', String(drawerOpen));
 });
 
 // Manual refresh and focus refresh

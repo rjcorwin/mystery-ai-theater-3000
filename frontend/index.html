@@ -9,36 +9,8 @@
   <body>
     <div id="app">
       <header id="appHeader">
-        <button id="miniHeaderToggle" class="secondary" title="Show or hide the toolbar" aria-expanded="true" style="order:-1">Hide Toolbar ▾</button>
+        <button id="miniHeaderToggle" class="secondary" title="Open settings drawer" aria-expanded="false" style="order:-1; min-width:44px; min-height:36px;">🔘</button>
         <h1>Mystery AI Theater 3000</h1>
-        <div class="header-controls">
-          <button id="shareBtn">Share Game Window</button>
-          <button id="stopBtn" disabled>Stop Share</button>
-          <button id="pauseBtn" class="secondary" disabled>Pause Capture</button>
-          <button id="muteBtn">🔇 Mute</button>
-          <label>
-            Mode
-            <select id="modeSelect">
-              <option value="interval" selected>Interval</option>
-              <option value="manual">Manual</option>
-            </select>
-          </label>
-          <button id="commentNowBtn" class="secondary" disabled>Comment Now</button>
-          <span id="commentStatus" class="status"></span>
-          <label class="inline">
-            <input id="hidePreviewChk" type="checkbox" /> Hide preview
-          </label>
-          <button id="miniToggle" class="secondary" title="Toggle mini layout">Mini Mode</button>
-          <label>
-            Interval (ms)
-            <input id="intervalInput" type="number" min="500" step="100" value="2500" />
-          </label>
-          <label>
-            History (0–100)
-            <input id="historyInput" type="number" min="0" max="100" step="1" value="10" />
-          </label>
-          <button id="settingsToggle" class="secondary">Voice Settings</button>
-        </div>
       </header>
 
       <main>
@@ -57,14 +29,43 @@
         </section>
       </main>
 
-    <!-- Bottom drawer: collapsible voice settings -->
-    <div id="settingsDrawer" class="drawer collapsed">
+    <!-- Top drawer: consolidated settings -->
+      <div id="settingsDrawer" class="drawer top collapsed">
       <div class="drawer-bar">
-        <strong>Voice Settings</strong>
+          <strong>Button Drawer</strong>
         <div class="spacer"></div>
-        <button id="drawerToggle" class="secondary">Expand</button>
+          <button id="drawerToggle" class="secondary" aria-label="Toggle Button Drawer">🔘</button>
       </div>
       <div class="drawer-content">
+        <div class="panel">
+          <h2>Capture & Layout</h2>
+          <div class="voice-row">
+            <div class="voice-title">Capture</div>
+              <button id="shareBtn">Share Game Window</button>
+              <button id="stopBtn" disabled>Stop Share</button>
+              <button id="pauseBtn" class="secondary" disabled>Pause Capture</button>
+              <button id="muteBtn">🔇 Mute</button>
+            <label>Interval (ms)
+              <input id="intervalInput" type="number" min="500" step="100" value="2500" />
+            </label>
+            <label>History (0–100)
+              <input id="historyInput" type="number" min="0" max="100" step="1" value="10" />
+            </label>
+            <label class="inline">Preview
+              <input id="hidePreviewChk" type="checkbox" /> Hide
+            </label>
+            <button id="miniToggle" class="secondary" title="Toggle mini layout">Mini Mode</button>
+              <label>Mode
+                <select id="modeSelect">
+                  <option value="interval" selected>Interval</option>
+                  <option value="manual">Manual</option>
+                </select>
+              </label>
+              <button id="commentNowBtn" class="secondary" disabled>Comment Now</button>
+              <span id="commentStatus" class="status"></span>
+          </div>
+        </div>
+
         <div class="panel">
           <h2>Voice Settings <button id="voiceRefresh" class="secondary" style="margin-left:8px">Refresh Voices</button></h2>
           <div class="voice-row">
