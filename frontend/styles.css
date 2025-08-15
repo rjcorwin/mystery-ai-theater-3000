@@ -3,6 +3,9 @@
   --fg: #e9eef7;
   --accent: #5fd1ff;
   --header-h: 56px;
+  --stage-min-h: 320px;
+  --stage-max-h: 85vh;
+  --stage-h: 48vh;
 }
 
 * { box-sizing: border-box; }
@@ -58,21 +61,16 @@ main {
   min-height: 0; /* allow children to size and scroll */
   display: grid;
   grid-template-columns: 1fr 380px;
+  grid-template-areas: "stage log";
   gap: 16px;
   padding: 16px;
 }
-.mini main {
-  grid-template-columns: 1fr;
-}
-.mini .log { order: 2; }
-.mini .stage { order: 1; }
 .mini .drawer { border-top: 1px solid #1a223a; }
-.mini header { flex-wrap: wrap; }
-.mini #commentStatus { flex-basis: 100%; margin-top: 6px; }
 
 /* Hide-stage mode: collapse theater and give log full width */
 .no-stage main { grid-template-columns: 1fr; }
 .no-stage .stage { display: none !important; }
+.no-stage .stage-resizer { display: none !important; }
 
 .drawer {
   position: fixed;
@@ -104,14 +102,18 @@ main {
   border: 1px solid #1a223a;
   border-radius: 8px;
   overflow: hidden;
-  min-height: 420px;
+  min-height: var(--stage-min-h);
+  max-height: var(--stage-max-h);
+  height: var(--stage-h);
+  grid-area: stage;
 }
 
 #preview {
   width: 100%;
-  height: auto;
+  height: 100%;
   display: block;
   opacity: 0.9;
+  object-fit: contain; /* never crop; letterbox left/right if needed */
 }
 
 .theater {
@@ -150,6 +152,7 @@ main {
   display: flex;
   flex-direction: column;
   min-height: 0; /* enable inner #log to scroll */
+  grid-area: log;
 }
 .log h2 { margin: 0 0 8px; font-size: 16px; }
 
@@ -192,4 +195,37 @@ main {
 .voice-row select { width: 100%; }
 select { background: #0f1b36; color: #e9eef7; border: 1px solid #1e2a46; border-radius: 6px; padding: 6px; }
 input[type="range"] { width: 100%; }
+
+/* Resizer that controls stage height in one-column mode too */
+.stage-resizer {
+  height: 8px;
+  margin: -8px 0 8px;
+  cursor: row-resize;
+  background: linear-gradient(to bottom, rgba(95,209,255,0.15), rgba(95,209,255,0.05));
+  border-radius: 4px;
+  grid-area: reszr;
+  display: none; /* hidden in two-column layout to avoid extra blank row */
+}
+
+/* Responsive two-column switch at 1200px */
+@media (max-width: 1200px) {
+  main {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "stage"
+      "reszr"
+      "log";
+  }
+  .stage-resizer { display: block; }
+}
+
+/* Wide screens: make stage auto-size by aspect ratio to minimize empty space */
+@media (min-width: 1201px) {
+  .stage {
+    height: auto;
+    min-height: 0;
+    max-height: none;
+    aspect-ratio: 16 / 9;
+  }
+}
 

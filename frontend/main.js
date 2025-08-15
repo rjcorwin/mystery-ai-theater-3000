@@ -34,9 +34,58 @@ const voiceRefresh = document.getElementById('voiceRefresh');
 const settingsToggle = document.getElementById('settingsToggle');
 const settingsDrawer = document.getElementById('settingsDrawer');
 const drawerToggle = document.getElementById('drawerToggle');
-const miniToggle = document.getElementById('miniToggle');
 const miniHeaderToggle = document.getElementById('miniHeaderToggle');
 const appHeader = document.getElementById('appHeader');
+const stageResizer = document.getElementById('stageResizer');
+
+// Stage height persistence and drag-resize
+const STAGE_H_KEY = 'mit3k.stageH';
+function setStageHeightCss(px) {
+  const minPx = 240;
+  const maxPx = Math.round(window.innerHeight * 0.9);
+  const clamped = Math.max(minPx, Math.min(maxPx, px));
+  document.documentElement.style.setProperty('--stage-h', clamped + 'px');
+  localStorage.setItem(STAGE_H_KEY, String(clamped));
+}
+function loadStageHeight() {
+  const v = Number(localStorage.getItem(STAGE_H_KEY) || 0);
+  if (v > 0) {
+    document.documentElement.style.setProperty('--stage-h', v + 'px');
+  }
+}
+loadStageHeight();
+
+if (stageResizer) {
+  let dragging = false;
+  let startY = 0;
+  let startH = 0;
+  const stageEl = document.querySelector('.stage');
+  const onMove = (e) => {
+    if (!dragging) return;
+    const y = e.touches ? e.touches[0].clientY : e.clientY;
+    const dy = y - startY;
+    setStageHeightCss(startH + dy);
+  };
+  const onUp = () => {
+    dragging = false;
+    window.removeEventListener('mousemove', onMove);
+    window.removeEventListener('mouseup', onUp);
+    window.removeEventListener('touchmove', onMove);
+    window.removeEventListener('touchend', onUp);
+  };
+  const onDown = (e) => {
+    const y = e.touches ? e.touches[0].clientY : e.clientY;
+    startY = y;
+    startH = stageEl.getBoundingClientRect().height;
+    dragging = true;
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    window.addEventListener('touchmove', onMove, { passive: false });
+    window.addEventListener('touchend', onUp);
+  };
+  stageResizer.addEventListener('mousedown', onDown);
+  stageResizer.addEventListener('touchstart', onDown, { passive: true });
+}
 
 let stream = null;
 let ws = null;
@@ -55,8 +104,7 @@ const LS_KEYS = {
   rate2: 'mit3k.rate2',
   history: 'mit3k.history',
 	interval: 'mit3k.interval',
-	mode: 'mit3k.mode',
-	mini: 'mit3k.mini'
+	mode: 'mit3k.mode'
 };
 
 function setButtonsState(capturing) {
@@ -378,12 +426,12 @@ function loadPersisted() {
   if (h) historyInput.value = h;
   const it = localStorage.getItem(LS_KEYS.interval);
   if (it) intervalInput.value = it;
-	const m = localStorage.getItem(LS_KEYS.mode);
-	if (m === 'manual' || m === 'interval') {
-		mode = m;
-		if (modeSelect) modeSelect.value = m;
-		if (commentNowBtn) commentNowBtn.disabled = mode !== 'manual';
-	}
+  const m = localStorage.getItem(LS_KEYS.mode);
+  if (m === 'manual' || m === 'interval') {
+    mode = m;
+    if (modeSelect) modeSelect.value = m;
+    if (commentNowBtn) commentNowBtn.disabled = mode !== 'manual';
+  }
   const p1 = localStorage.getItem(LS_KEYS.pitch1); if (p1) voice1Pitch.value = p1;
   const p2 = localStorage.getItem(LS_KEYS.pitch2); if (p2) voice2Pitch.value = p2;
   const r1 = localStorage.getItem(LS_KEYS.rate1); if (r1) voice1Rate.value = r1;
@@ -396,9 +444,6 @@ function loadPersisted() {
   voice2RateVal.textContent = voice2Rate.value;
   voice1VolVal.textContent = Number(voice1Vol.value).toFixed(2);
   voice2VolVal.textContent = Number(voice2Vol.value).toFixed(2);
-	const mini = localStorage.getItem(LS_KEYS.mini) === '1';
-	document.documentElement.classList.toggle('mini', mini);
-	if (miniToggle) miniToggle.textContent = mini ? 'Exit Mini' : 'Mini Mode';
 }
 
 function persistLive() {
@@ -459,13 +504,7 @@ if (drawerToggle) {
   drawerToggle.addEventListener('click', () => { drawerOpen = !drawerOpen; setDrawer(drawerOpen); });
 }
 
-// Mini mode toggle
-miniToggle.addEventListener('click', () => {
-  const next = !document.documentElement.classList.contains('mini');
-  document.documentElement.classList.toggle('mini', next);
-  miniToggle.textContent = next ? 'Exit Mini' : 'Mini Mode';
-  localStorage.setItem(LS_KEYS.mini, next ? '1' : '0');
-});
+// No mini mode; responsive layout handles 1/2 columns
 
 // Collapse header controls in mini mode
 // Header emoji toggles the top Button Drawer
