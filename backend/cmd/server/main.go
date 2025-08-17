@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"log"
 	"net/http"
 	"os"
@@ -9,6 +10,7 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/rjcorwin/mystery-ai-theater-3000/backend/internal/ai"
 	svr "github.com/rjcorwin/mystery-ai-theater-3000/backend/internal/server"
+	"github.com/rjcorwin/mystery-ai-theater-3000/backend/internal/tts"
 )
 
 func main() {
@@ -61,6 +63,51 @@ func main() {
 	}
 	fs := http.FileServer(http.Dir(frontendDir))
 	mux.Handle("/", fs)
+
+	// Optional ElevenLabs TTS endpoints
+	elevenKey := os.Getenv("ELEVENLABS_API_KEY")
+	elevenModel := os.Getenv("ELEVENLABS_MODEL")
+	if elevenKey != "" {
+		// Defer importing encoding/json until required path compiles
+		mux.HandleFunc("/api/tts/voices", func(w http.ResponseWriter, r *http.Request) {
+			ctx := r.Context()
+			client := tts.NewElevenLabsClient(elevenKey, elevenModel)
+			voices, err := client.ListVoices(ctx)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusBadGateway)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(voices)
+		})
+		mux.HandleFunc("/api/tts/speak", func(w http.ResponseWriter, r *http.Request) {
+			if r.Method != http.MethodPost {
+				http.Error(w, "method", http.StatusMethodNotAllowed)
+				return
+			}
+			type reqBody struct {
+				VoiceID string `json:"voiceId"`
+				Text    string `json:"text"`
+			}
+			var body reqBody
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				http.Error(w, "bad json", http.StatusBadRequest)
+				return
+			}
+			client := tts.NewElevenLabsClient(elevenKey, elevenModel)
+			data, err := client.Synthesize(r.Context(), body.VoiceID, body.Text)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusBadGateway)
+				return
+			}
+			w.Header().Set("Content-Type", "audio/mpeg")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write(data)
+		})
+		log.Println("ElevenLabs TTS enabled")
+	} else {
+		log.Println("ELEVENLABS_API_KEY not set: ElevenLabs TTS disabled")
+	}
 
 	log.Printf("Server listening on :%s\n", port)
 	if err := http.ListenAndServe(":"+port, mux); err != nil {

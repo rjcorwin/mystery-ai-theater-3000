@@ -33,6 +33,7 @@ Environment
 -----------
 - `OPENAI_API_KEY`: your OpenAI key
 - Optional: `PORT` (default `8080`)
+- Optional: `ELEVENLABS_API_KEY` and `ELEVENLABS_MODEL` (default `eleven_multilingual_v2`) to enable ElevenLabs TTS endpoints at `/api/tts/*`.
 
 Security & Privacy
 ------------------

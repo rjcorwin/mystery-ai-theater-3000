@@ -3,10 +3,13 @@ const shareBtn = document.getElementById('shareBtn');
 const stopBtn = document.getElementById('stopBtn');
 const pauseBtn = document.getElementById('pauseBtn');
 const muteBtn = document.getElementById('muteBtn');
+const muteBtnTop = document.getElementById('muteBtnTop');
 const intervalInput = document.getElementById('intervalInput');
+const settingsSaveBtn = document.getElementById('settingsSaveBtn');
 const historyInput = document.getElementById('historyInput');
 const modeSelect = document.getElementById('modeSelect');
 const commentNowBtn = document.getElementById('commentNowBtn');
+const commentNowHeaderBtn = document.getElementById('commentNowHeaderBtn');
 const commentStatus = document.getElementById('commentStatus');
 const hidePreviewChk = document.getElementById('hidePreviewChk');
 const captureCanvas = document.getElementById('captureCanvas');
@@ -16,6 +19,8 @@ const viewer2 = document.getElementById('viewer2');
 // Voice controls
 const voice1Select = document.getElementById('voice1Select');
 const voice2Select = document.getElementById('voice2Select');
+const voice1Eleven = document.getElementById('voice1Eleven');
+const voice2Eleven = document.getElementById('voice2Eleven');
 const voice1Pitch = document.getElementById('voice1Pitch');
 const voice2Pitch = document.getElementById('voice2Pitch');
 const voice1Rate = document.getElementById('voice1Rate');
@@ -33,10 +38,10 @@ const voice2Test = document.getElementById('voice2Test');
 const voiceRefresh = document.getElementById('voiceRefresh');
 const settingsToggle = document.getElementById('settingsToggle');
 const settingsDrawer = document.getElementById('settingsDrawer');
-const drawerToggle = document.getElementById('drawerToggle');
 const miniHeaderToggle = document.getElementById('miniHeaderToggle');
 const appHeader = document.getElementById('appHeader');
 const stageResizer = document.getElementById('stageResizer');
+const themeSelect = document.getElementById('themeSelect');
 
 // Stage height persistence and drag-resize
 const STAGE_H_KEY = 'mit3k.stageH';
@@ -95,16 +100,71 @@ let voices = [];
 let mode = 'interval';
 let capturePaused = false;
 
+// Single-channel TTS queue to avoid overlapping playback
+const ttsQueue = [];
+let ttsPlaying = false;
+// Track currently playing ElevenLabs audio so we can stop it on mute
+let currentAudio = null;
+let currentAudioUrl = null;
+let resolveCurrentAudioEnd = null;
+let audioUnlocked = false;
+
+async function unlockAudio() {
+  if (audioUnlocked) return true;
+  try {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) { audioUnlocked = true; return true; }
+    const ctx = new AC();
+    await ctx.resume();
+    const buffer = ctx.createBuffer(1, 1, 22050);
+    const src = ctx.createBufferSource();
+    src.buffer = buffer;
+    src.connect(ctx.destination);
+    src.start(0);
+    audioUnlocked = true;
+    setTimeout(() => { try { ctx.close(); } catch {} }, 50);
+    return true;
+  } catch {
+    return false;
+  }
+}
+function enqueueSpeak(which, text) {
+  ttsQueue.push({ which, text });
+  drainTtsQueue();
+}
+async function drainTtsQueue() {
+  if (ttsPlaying) return;
+  const next = ttsQueue.shift();
+  if (!next) return;
+  ttsPlaying = true;
+  try {
+    await performSpeak(next.which, next.text);
+  } catch {}
+  ttsPlaying = false;
+  drainTtsQueue();
+}
+
+// Keep only English voices (Safari-compatible locales like en-US, en-GB, en-AU)
+function filterEnglishVoices(list) {
+  return (list || []).filter(v => {
+    const lang = (v.lang || '').toLowerCase();
+    return lang.startsWith('en');
+  });
+}
+
 const LS_KEYS = {
   voice1: 'mit3k.voice1',
   voice2: 'mit3k.voice2',
+  voice1Eleven: 'mit3k.voice1.eleven',
+  voice2Eleven: 'mit3k.voice2.eleven',
   pitch1: 'mit3k.pitch1',
   pitch2: 'mit3k.pitch2',
   rate1: 'mit3k.rate1',
   rate2: 'mit3k.rate2',
   history: 'mit3k.history',
 	interval: 'mit3k.interval',
-	mode: 'mit3k.mode'
+	mode: 'mit3k.mode',
+  theme: 'mit3k.theme'
 };
 
 function setButtonsState(capturing) {
@@ -113,12 +173,31 @@ function setButtonsState(capturing) {
   if (pauseBtn) pauseBtn.disabled = !capturing;
 }
 
+function getViewerLabel(which) {
+  const selEleven = which === 1 ? voice1Eleven : voice2Eleven;
+  if (selEleven && selEleven.value) {
+    const opt = selEleven.options[selEleven.selectedIndex];
+    if (opt && opt.textContent) return opt.textContent;
+  }
+  const sel = which === 1 ? voice1Select : voice2Select;
+  if (sel) {
+    const opt = sel.options[sel.selectedIndex];
+    if (opt && opt.textContent) return opt.textContent;
+  }
+  return `Viewer ${which}`;
+}
+
 function appendLine(who, text) {
   const div = document.createElement('div');
   div.className = 'line';
   const whoEl = document.createElement('span');
   whoEl.className = 'who';
-  whoEl.textContent = who + ':';
+  let labelText = who;
+  if (who !== 'System') {
+    const which = String(who).includes('1') ? 1 : 2;
+    labelText = getViewerLabel(which);
+  }
+  whoEl.textContent = labelText + ':';
   const textEl = document.createElement('span');
   textEl.textContent = ' ' + text;
   div.appendChild(whoEl);
@@ -143,21 +222,60 @@ function resolveVoice(which) {
 }
 
 function speak(text, which) {
+  enqueueSpeak(which, text);
+}
+
+async function performSpeak(which, text) {
   if (isMuted) return;
-  if (!('speechSynthesis' in window)) return;
-  const utter = new SpeechSynthesisUtterance(text);
-  const v = resolveVoice(which);
-  if (v) utter.voice = v;
-  utter.rate = which === 1 ? Number(voice1Rate.value || 1.1) : Number(voice2Rate.value || 1.1);
-  utter.pitch = which === 1 ? Number(voice1Pitch.value || 1.2) : Number(voice2Pitch.value || 0.9);
-  utter.volume = which === 1 ? Number(voice1Vol.value || 1.0) : Number(voice2Vol.value || 1.0);
-  utter.onstart = () => {
-    (which === 1 ? viewer1 : viewer2).classList.add('speaking');
-  };
-  utter.onend = () => {
-    (which === 1 ? viewer1 : viewer2).classList.remove('speaking');
-  };
-  speechSynthesis.speak(utter);
+  const elevenSel = which === 1 ? voice1Eleven : voice2Eleven;
+  const elevenId = elevenSel && elevenSel.value ? elevenSel.value : '';
+  const speakingEl = which === 1 ? viewer1 : viewer2;
+  if (elevenId) {
+    speakingEl.classList.add('speaking');
+    try {
+      const ok = await (async () => {
+        await unlockAudio();
+        const res = await fetch('/api/tts/speak', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ voiceId: elevenId, text }) });
+        if (!res.ok) return false;
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const audio = new Audio(url);
+        // Apply UI rate/volume to remote audio
+        const vol = which === 1 ? Number(voice1Vol.value || 1.0) : Number(voice2Vol.value || 1.0);
+        const rate = which === 1 ? Number(voice1Rate.value || 1.1) : Number(voice2Rate.value || 1.1);
+        audio.volume = Math.max(0, Math.min(1, vol));
+        // playbackRate affects speed and pitch together; ElevenLabs API does not expose separate pitch here
+        audio.playbackRate = Math.max(0.5, Math.min(2, rate));
+        currentAudio = audio; currentAudioUrl = url;
+        await audio.play();
+        await new Promise(resolve => { resolveCurrentAudioEnd = resolve; audio.onended = () => resolve(); });
+        if (currentAudioUrl) { try { URL.revokeObjectURL(currentAudioUrl); } catch {} }
+        currentAudio = null; currentAudioUrl = null; resolveCurrentAudioEnd = null;
+        return true;
+      })();
+      if (!ok) await speakWithBrowser(which, text);
+    } catch {
+      await speakWithBrowser(which, text);
+    }
+    speakingEl.classList.remove('speaking');
+    return;
+  }
+  await speakWithBrowser(which, text);
+}
+
+function speakWithBrowser(which, text) {
+  return new Promise((resolve) => {
+    if (!('speechSynthesis' in window)) { resolve(); return; }
+    const utter = new SpeechSynthesisUtterance(text);
+    const v = resolveVoice(which);
+    if (v) utter.voice = v;
+    utter.rate = which === 1 ? Number(voice1Rate.value || 1.1) : Number(voice2Rate.value || 1.1);
+    utter.pitch = which === 1 ? Number(voice1Pitch.value || 1.2) : Number(voice2Pitch.value || 0.9);
+    utter.volume = which === 1 ? Number(voice1Vol.value || 1.0) : Number(voice2Vol.value || 1.0);
+    utter.onstart = () => { (which === 1 ? viewer1 : viewer2).classList.add('speaking'); };
+    utter.onend = () => { (which === 1 ? viewer1 : viewer2).classList.remove('speaking'); resolve(); };
+    speechSynthesis.speak(utter);
+  });
 }
 
 function parseXMLLines(xml) {
@@ -193,8 +311,10 @@ async function startShare() {
 function scheduleCapture() {
   if (captureTimer) clearInterval(captureTimer);
   if (mode === 'interval' && !capturePaused) {
-    const interval = Math.max(500, Number(intervalInput.value) || 2500);
-    captureTimer = setInterval(captureAndSend, interval);
+    // Convert seconds to ms
+    const secs = Math.max(0.5, Number(intervalInput.value) || 2.5);
+    const intervalMs = Math.round(secs * 1000);
+    captureTimer = setInterval(captureAndSend, intervalMs);
   }
 }
 
@@ -263,6 +383,10 @@ function openSocket() {
           speak(text, who);
           scrollLogToBottom();
         });
+        // Reset header button loading state if we were in manual request
+        if (commentStatus.dataset.busy === '1') {
+          if (commentNowHeaderBtn) { commentNowHeaderBtn.disabled = false; commentNowHeaderBtn.textContent = 'Comment Now'; }
+        }
         if (commentStatus.dataset.busy === '1') {
           commentStatus.textContent = '';
           commentStatus.dataset.busy = '0';
@@ -284,14 +408,20 @@ if (pauseBtn) {
     scheduleCapture();
   });
 }
-intervalInput.addEventListener('change', scheduleCapture);
-intervalInput.addEventListener('input', scheduleCapture);
-historyInput.addEventListener('change', () => {});
+// Defer applying changes until Save is clicked
+function saveSettings() {
+  localStorage.setItem(LS_KEYS.history, historyInput.value);
+  localStorage.setItem(LS_KEYS.interval, intervalInput.value);
+  localStorage.setItem(LS_KEYS.mode, modeSelect.value);
+  // re-schedule capture with new settings
+  scheduleCapture();
+}
+settingsSaveBtn.addEventListener('click', saveSettings);
+// Light immediate UI feedback only (no network/capture reschedule until Save)
 historyInput.addEventListener('input', () => {});
 modeSelect.addEventListener('change', () => {
   mode = modeSelect.value;
   commentNowBtn.disabled = mode !== 'manual';
-  scheduleCapture();
 });
 commentNowBtn.addEventListener('click', () => {
   if (mode !== 'manual') return;
@@ -300,14 +430,36 @@ commentNowBtn.addEventListener('click', () => {
   commentStatus.textContent = 'Waiting for commentary…';
   commentStatus.dataset.busy = '1';
   captureAndSend();
+  // Ensure audio is unlocked prior to first manual speak
+  unlockAudio();
 });
-muteBtn.addEventListener('click', () => {
+
+if (commentNowHeaderBtn) {
+  commentNowHeaderBtn.addEventListener('click', () => {
+    if (mode !== 'manual') return;
+    // Indicate loading on header button and status line
+    commentNowHeaderBtn.disabled = true;
+    commentNowHeaderBtn.textContent = 'Commenting…';
+    commentStatus.textContent = 'Waiting for commentary…';
+    commentStatus.dataset.busy = '1';
+    captureAndSend();
+    unlockAudio();
+  });
+}
+function toggleMute() {
   isMuted = !isMuted;
-  muteBtn.textContent = isMuted ? '🔊 Unmute' : '🔇 Mute';
+  const label = isMuted ? '🔊 Unmute' : '🔇 Mute';
+  if (muteBtn) muteBtn.textContent = label;
+  if (muteBtnTop) muteBtnTop.textContent = label;
+  // Stop any in-flight playback immediately
   try { speechSynthesis.cancel(); } catch {}
+  if (currentAudio) { try { currentAudio.pause(); currentAudio.currentTime = 0; } catch {} }
+  if (resolveCurrentAudioEnd) { try { resolveCurrentAudioEnd(); } catch {} }
   viewer1.classList.remove('speaking');
   viewer2.classList.remove('speaking');
-});
+}
+if (muteBtn) muteBtn.addEventListener('click', toggleMute);
+if (muteBtnTop) muteBtnTop.addEventListener('click', toggleMute);
 
 function stopShare() {
   if (captureTimer) {
@@ -331,7 +483,7 @@ function stopShare() {
 
 // Voice population and persistence
 function populateVoices() {
-  voices = speechSynthesis.getVoices() || [];
+  voices = filterEnglishVoices(speechSynthesis.getVoices() || []);
   const opts = voices.map(v => {
     const o = document.createElement('option');
     o.value = v.name;
@@ -373,7 +525,7 @@ function waitForVoices(maxWaitMs = 10000) {
   return new Promise((resolve) => {
     const start = Date.now();
     function check() {
-      const list = speechSynthesis.getVoices();
+      const list = filterEnglishVoices(speechSynthesis.getVoices());
       if (list && list.length) {
         voices = list;
         resolve(list);
@@ -387,7 +539,7 @@ function waitForVoices(maxWaitMs = 10000) {
     }
     // attach event as well
     const onChange = () => {
-      const list = speechSynthesis.getVoices();
+      const list = filterEnglishVoices(speechSynthesis.getVoices());
       if (list && list.length) {
         voices = list;
         speechSynthesis.onvoiceschanged = null;
@@ -421,11 +573,35 @@ async function ensureVoicesLoaded(force = false) {
   return voices.length > 0;
 }
 
+// ElevenLabs integration
+async function fetchElevenVoices() {
+  try {
+    const res = await fetch('/api/tts/voices');
+    if (!res.ok) return [];
+    return await res.json();
+  } catch { return []; }
+}
+
+async function speakWithEleven(voiceId, text) {
+  try {
+    const res = await fetch('/api/tts/speak', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ voiceId, text })
+    });
+    if (!res.ok) return false;
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const audio = new Audio(url);
+    await audio.play();
+    return true;
+  } catch { return false; }
+}
+
 function loadPersisted() {
   const h = localStorage.getItem(LS_KEYS.history);
   if (h) historyInput.value = h;
   const it = localStorage.getItem(LS_KEYS.interval);
-  if (it) intervalInput.value = it;
+  if (it) intervalInput.value = it; // stored in seconds
   const m = localStorage.getItem(LS_KEYS.mode);
   if (m === 'manual' || m === 'interval') {
     mode = m;
@@ -438,12 +614,17 @@ function loadPersisted() {
   const r2 = localStorage.getItem(LS_KEYS.rate2); if (r2) voice2Rate.value = r2;
   const v1 = localStorage.getItem('mit3k.vol1'); if (v1) voice1Vol.value = v1;
   const v2 = localStorage.getItem('mit3k.vol2'); if (v2) voice2Vol.value = v2;
+  const e1 = localStorage.getItem(LS_KEYS.voice1Eleven); if (e1 && voice1Eleven) voice1Eleven.value = e1;
+  const e2 = localStorage.getItem(LS_KEYS.voice2Eleven); if (e2 && voice2Eleven) voice2Eleven.value = e2;
   voice1PitchVal.textContent = voice1Pitch.value;
   voice2PitchVal.textContent = voice2Pitch.value;
   voice1RateVal.textContent = voice1Rate.value;
   voice2RateVal.textContent = voice2Rate.value;
   voice1VolVal.textContent = Number(voice1Vol.value).toFixed(2);
   voice2VolVal.textContent = Number(voice2Vol.value).toFixed(2);
+  const theme = localStorage.getItem(LS_KEYS.theme) || 'default';
+  applyTheme(theme);
+  if (themeSelect) themeSelect.value = theme;
 }
 
 function persistLive() {
@@ -456,8 +637,27 @@ function persistLive() {
   voice2Rate.addEventListener('input', () => { voice2RateVal.textContent = voice2Rate.value; localStorage.setItem(LS_KEYS.rate2, voice2Rate.value); });
   voice1Select.addEventListener('change', () => localStorage.setItem(LS_KEYS.voice1, voice1Select.value));
   voice2Select.addEventListener('change', () => localStorage.setItem(LS_KEYS.voice2, voice2Select.value));
+  if (voice1Eleven) voice1Eleven.addEventListener('change', () => localStorage.setItem(LS_KEYS.voice1Eleven, voice1Eleven.value));
+  if (voice2Eleven) voice2Eleven.addEventListener('change', () => localStorage.setItem(LS_KEYS.voice2Eleven, voice2Eleven.value));
   voice1Vol.addEventListener('input', () => { voice1VolVal.textContent = Number(voice1Vol.value).toFixed(2); localStorage.setItem('mit3k.vol1', voice1Vol.value); });
   voice2Vol.addEventListener('input', () => { voice2VolVal.textContent = Number(voice2Vol.value).toFixed(2); localStorage.setItem('mit3k.vol2', voice2Vol.value); });
+  if (themeSelect) themeSelect.addEventListener('change', () => { const t = themeSelect.value; localStorage.setItem(LS_KEYS.theme, t); applyTheme(t); });
+}
+
+function applyTheme(theme) {
+  const html = document.documentElement;
+  html.classList.remove('theme-unicorn','theme-ocean','theme-sunset','theme-forest','theme-terminal','theme-vaporwave','theme-solarized','theme-mono');
+  switch (theme) {
+    case 'unicorn': html.classList.add('theme-unicorn'); break;
+    case 'ocean': html.classList.add('theme-ocean'); break;
+    case 'sunset': html.classList.add('theme-sunset'); break;
+    case 'forest': html.classList.add('theme-forest'); break;
+    case 'terminal': html.classList.add('theme-terminal'); break;
+    case 'vaporwave': html.classList.add('theme-vaporwave'); break;
+    case 'solarized': html.classList.add('theme-solarized'); break;
+    case 'mono': html.classList.add('theme-mono'); break;
+    default: /* default theme */ break;
+  }
 }
 
 function testVoice(which) {
@@ -472,6 +672,25 @@ voice2Test.addEventListener('click', async () => { await ensureVoicesLoaded(true
 loadPersisted();
 (async () => { await ensureVoicesLoaded(false); })();
 persistLive();
+// Load ElevenLabs voices into selects if backend is configured
+(async () => {
+  const list = await fetchElevenVoices();
+  [voice1Eleven, voice2Eleven].forEach((sel, idx) => {
+    if (!sel) return;
+    sel.innerHTML = '';
+    if (!list.length) {
+      const o = document.createElement('option'); o.value=''; o.textContent='(Disabled)'; sel.appendChild(o); return;
+    }
+    list.forEach(v => {
+      const id = v.voice_id || v.VoiceID || v.id || v.voiceId;
+      const name = v.name || v.Name || 'Voice';
+      const o = document.createElement('option'); o.value = id; o.textContent = name; sel.appendChild(o);
+    });
+    const key = idx === 0 ? LS_KEYS.voice1Eleven : LS_KEYS.voice2Eleven;
+    const prev = localStorage.getItem(key);
+    if (prev) sel.value = prev;
+  });
+})();
 // honor initial hide preview state on load
 if (hidePreviewChk) {
   document.documentElement.classList.toggle('no-stage', hidePreviewChk.checked);
@@ -483,25 +702,23 @@ if (hidePreviewChk) {
 // Manual refresh and focus refresh for voices
 voiceRefresh.addEventListener('click', async () => {
   await ensureVoicesLoaded(true);
+  voices = filterEnglishVoices(speechSynthesis.getVoices() || []);
   populateVoices();
 });
 
 window.addEventListener('focus', async () => {
   await ensureVoicesLoaded(false);
+  voices = filterEnglishVoices(speechSynthesis.getVoices() || voices);
   populateVoices();
 });
 
 // Drawer/collapsible controls
 function setDrawer(open) {
   settingsDrawer.classList.toggle('collapsed', !open);
-  drawerToggle.textContent = open ? 'Collapse' : 'Expand';
 }
 let drawerOpen = false;
 if (settingsToggle) {
   settingsToggle.addEventListener('click', () => { drawerOpen = !drawerOpen; setDrawer(drawerOpen); });
-}
-if (drawerToggle) {
-  drawerToggle.addEventListener('click', () => { drawerOpen = !drawerOpen; setDrawer(drawerOpen); });
 }
 
 // No mini mode; responsive layout handles 1/2 columns
@@ -518,11 +735,11 @@ miniHeaderToggle.addEventListener('click', () => {
 voiceRefresh.addEventListener('click', async () => {
   primeSpeechEngine();
   await new Promise(r => setTimeout(r, 200));
-  voices = speechSynthesis.getVoices() || [];
+  voices = filterEnglishVoices(speechSynthesis.getVoices() || []);
   populateVoices();
 });
 window.addEventListener('focus', async () => {
-  voices = speechSynthesis.getVoices() || voices;
+  voices = filterEnglishVoices(speechSynthesis.getVoices() || voices);
   populateVoices();
 });
 
