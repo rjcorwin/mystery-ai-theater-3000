@@ -17,7 +17,7 @@
 - [x] 2.5.6 Feature: Plz update the names of the bots in chat according to the voice we select
 - [x] 2.5.7 The comment now button is tucked away in the drawer but needs to be somewhere handy that I can click without opening the drawer. 
 - [x] 2.7 So we don't need mini mode vs. not mini mode, it just needs to be responsive one-column vs. two column. So I noticed that past 1200px width of the screen, the screencapture starts to get cut off. I think we can assume wide screen aspect angle, typical of gaming... I want to be able to increase the window width and be able to have a two column layout.. But when making the screen more narrow, I want the layout to be one column. I also want to be able to control via grab handle the screenshare height. Never cut off the screenshare. It's ok if there is negative space to the left and right, but not top and bottom when in one-column mode.
-- [ ] 2.8 Let's give this app a new visual vibe. I'm THINKIN UNICORN RAINBOW THEME. Make it sparkle. ✨
+- [x] 2.8 Let's give this app a new visual vibe. I'm THINKIN UNICORN RAINBOW THEME. Make it sparkle. ✨
 
 
 - [ ] 3.0 Let's remove the browser based voices for now. CLean it all up from the UI and any code. We're just supporting eleven labs voices now. 
